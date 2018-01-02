@@ -1,0 +1,15 @@
+page-register {
+  text-align: center;
+
+  ion-content {
+    background: rgba(0, 0, 0, 0.53) !important;
+  }
+
+  ion-input {
+    color: color($colors, dark);
+  }
+
+  p {
+    color: color($colors, light);
+  }
+}

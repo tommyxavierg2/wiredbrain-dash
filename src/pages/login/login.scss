@@ -1,0 +1,21 @@
+page-login {
+  text-align: center;
+
+  ion-content {
+    background: rgba(0, 0, 0, 0.53) !important;
+  }
+
+  p {
+    color: color($colors, dark);
+  }
+
+  .logo {
+    width: 30%;
+    height: 10%;
+  }
+
+  ion-toolbar {
+    text-align: center;
+  }
+
+}
