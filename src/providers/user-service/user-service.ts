@@ -6,7 +6,8 @@ import * as firebase from 'firebase/app';
 import { AlertController } from 'ionic-angular';
 
 import { Storage } from '@ionic/storage';
-import { AngularFireDatabase, FirebaseListObservable } from "angularfire2/database-deprecated";
+import { AngularFireDatabase } from 'angularfire2/database';
+import { FirebaseListObservable } from 'angularfire2/database-deprecated';
 
 import { RewardServiceProvider } from '../reward-service/reward-service';
 
@@ -21,19 +22,21 @@ export class UserServiceProvider {
 
   items: FirebaseListObservable<any>;
 
-  success: boolean;
+  success:boolean;
 
-  user: any;
+  user: string;
+
+
 
   constructor(private afAuth: AngularFireAuth, public alertCtrl: AlertController,
-              private storage: Storage, private fbDb: AngularFireDatabase,
-              private rewardService: RewardServiceProvider) {
+              private storage: Storage,  private fbDb: AngularFireDatabase,
+              private reward: RewardServiceProvider) {
 
-  this.items = fbDb.list('/users');
+    // this.items = fbDb.list('/users')
 
   }
 
-  displayAlert(alertTitle, alertSub) {
+  displayAlert(alertTitle, alertSub){
     let theAlert = this.alertCtrl.create({
       title: alertTitle,
       subTitle: alertSub,
@@ -42,54 +45,65 @@ export class UserServiceProvider {
     theAlert.present();
   }
 
-  logOut() {
+  logOut(){
+    //this.storageControl('delete');
     this.afAuth.auth.signOut()
-     .then(loggedOut => {
-       this.displayAlert('Logged out', 'Come back soon');
-       this.success = false;
-     })
-     .catch(err => this.displayAlert('Error Loggin out', err));
+      .then(loggedOut => {
+        this.displayAlert('Logged out', 'Come back and visit soon')
+        this.success = false;
+      })
+      .catch(err => this.displayAlert('Error logging out',err));
   }
 
-  storageControl(action, key?, value?) {
+
+  storageControl(action, key?,value?) {
     if (action == 'set'){
       return this.storage.set(key, value);
     }
-    else if (action =='get'){
+    if (action == 'get'){
       return this.storage.get(key);
     }
-    else if (action == 'delete'){
-      if (!key){
-        this.displayAlert('Warning', 'About to delete all user data');
+    if (action == 'delete'){
+      if (!key) {
+        this.displayAlert('Warning','About to delete all user data');
         return this.storage.clear();
       }
       else {
-        this.displayAlert(key, 'Deleting this users data');
+        this.displayAlert( key,'Deleting this users data');
         return this.storage.remove(key);
       }
     }
 
-    else {}
-
   }
 
-  saveNewUser(user) {
+  saveNewUser(user){
     let userObj = {
-      creation: new Date().toDateString(), logins: 1, rewardCount: 0,
-      lastLogin: new Date().toLocaleString(), id: ''
+      creation: new Date().toDateString(),
+      logins: 1,
+      rewardCount: 0,
+      lastLogin: new Date().toLocaleString(),
+      id: 0
     }
-    this.items.push({
-      username: user, creation: userObj.creation, logins: userObj.logins,
-      rewardCount: userObj.logins, lastLogin: userObj.lastLogin
-    })
-    .then(res => {
-      userObj.id = res.key;
-    });
+    // this.items.push({
+    //   username: user,
+    //   creation: userObj.creation,
+    //   logins: userObj.logins,
+    //   rewardCount: userObj.rewardCount,
+    //   lastLogin: userObj.lastLogin
+    // })
+    // .then(res => {
+    //   userObj.id = res.key;
+    //   return this.storageControl('set', user, userObj );
+    // });
 
-    return this.storageControl('set', user, userObj);
+    userObj.id = 1;
+    this.storageControl('set', user, userObj );
+
+    return this.storageControl('get', user);
+
   }
 
-  updateUser(theUser, theUserData) {
+  updateUser(theUser,theUserData){
     let newData = {
       creation: theUserData.creation,
       logins: theUserData.logins,
@@ -97,49 +111,46 @@ export class UserServiceProvider {
       lastLogin: new Date().toLocaleString(),
       id: theUserData.id
     }
-    this.items.update(newData.id, {
-      logins: newData.logins,
-      rewardCount: newData.rewardCount,
-      lastLogin: newData.lastLogin
-    });
-
-    return this.storageControl('set', theUser, newData);
+    // this.items.update(newData.id,{
+    //   logins: newData.logins,
+    //   rewardCount: newData.rewardCount,
+    //   lastLogin: newData.lastLogin
+    // });
+    return this.storageControl('set', theUser, newData );
   }
 
   logOn(user, password) {
-    return this.afAuth.auth.signInWithEmailAndPassword(user, password)
-    .then(result => {
+    return this.afAuth.auth.signInWithEmailAndPassword(user,password)
+      .then(result => {
+        this.storageControl('get',user)
+          .then( returned => {
+            if (!returned) {
+              this.saveNewUser(user)
+              .then(res => this.displayAlert(user,'New account saved for this user'));
+            }
+            else{
+              this.reward.rewardsCheck( user, returned )
+              .then( rewardResult => {
 
-      this.storageControl('get', user)
-      .then(returned => {
-        console.log(returned);
+                this.updateUser(user, rewardResult)
+                .then(updated => console.log(user ,updated))
 
-        if (!returned) {
+              })
+            }
+          })
 
-          this.saveNewUser(user)
-          .then(res => this.displayAlert(user, 'New account saved for this user'))
-        }
-        else {
-
-          this.displayAlert('Welcome back!!', user);
-          this.user = user;
-
-          //  this.rewardService.rewardsCheck(user, returned)
-          // .then( rewardResult => {
-          //   this.updateUser(user, rewardResult)
-          //   .then(updated => this.displayAlert('Welcome back!!', user))
-          // })
-        }
+          this.success = true;
+          return result;
       })
+      .catch(err => {
+        this.success = false;
+        this.displayAlert('Error logging in',err)
+        return err;
+      });
+  }
 
-      this.success = true;
-      return result;
-    })
-    .catch(err => {
-      this.success = false;
-      this.displayAlert('Error loggin in', err)
-      return err;
-    });
+  returnUser(){
+    return Promise.resolve(this.user);
   }
 
 }
